@@ -1,0 +1,13 @@
+<Graphic version="2.0" viewHeight="28" viewWidth="58" xmlns="http://ns.adobe.com/fxg/2008" xmlns:fxg="http://ns.adobe.com/fxg/2008" xmlns:d="http://ns.adobe.com/fxg/2008/dt">
+  <Rect width="58" height="28" topLeftRadiusX="5" topRightRadiusX="0" bottomLeftRadiusX="5" bottomRightRadiusX="0">
+    <fill>
+      <SolidColor color="#7D5177" alpha="1"/>
+    </fill>
+  </Rect>
+  <Rect width="58" height="28" topLeftRadiusX="5" topRightRadiusX="0" bottomLeftRadiusX="5" bottomRightRadiusX="0">
+    <stroke>
+      <SolidColorStroke color="#7D5177" alpha="0.7" weight="1" />
+    </stroke>
+  </Rect>
+
+</Graphic>

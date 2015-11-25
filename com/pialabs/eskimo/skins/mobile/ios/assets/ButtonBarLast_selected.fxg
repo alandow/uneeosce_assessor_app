@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Graphic  version="2.0" xmlns="http://ns.adobe.com/fxg/2008"
+           viewWidth="58" viewHeight="28" scaleGridLeft="5" scaleGridTop="5" scaleGridRight="48" scaleGridBottom="18">
+
+
+    <Rect width="58" height="28" topRightRadiusX="5" bottomRightRadiusX="5">
+            <fill>
+             <SolidColor color="#7D5177" alpha="1"/>
+        </fill>
+    </Rect>
+
+
+
+    <Rect y="1" width="58" height="28" topRightRadiusX="5" bottomRightRadiusX="5">
+       <stroke>
+            <LinearGradientStroke weight="2">
+              <GradientEntry color="#FBDF59" alpha="0.5" ratio="0.8"/>
+                <GradientEntry color="#FFFFFF" alpha="0.5" ratio="0.2"/>
+            </LinearGradientStroke>
+        </stroke>
+    </Rect>
+
+</Graphic>

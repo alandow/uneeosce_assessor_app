@@ -1,0 +1,484 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Application xmlns:fx="http://ns.adobe.com/mxml/2009" 
+			   xmlns:s="library://ns.adobe.com/flex/spark" 
+			   preinitialize="this_preinitializeHandler(event)"
+			   splashScreenImage="@Embed('icons/launch.png')"
+			   splashScreenScaleMode="stretch">
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+		<fx:uint id="titlecolor">#3D3E3F</fx:uint>
+	</fx:Declarations>
+	<fx:Style>
+		@namespace s "library://ns.adobe.com/flex/spark";
+		
+		
+		s|ActionBar {chromeColor: PropertyReference("titlecolor");
+		}
+		
+		
+		s|Button{
+			chromeColor: #96C03D;
+			fontFamily: opensans;
+			skinClass:ClassReference("com.pialabs.eskimo.skins.mobile.ios.ButtonSkin");
+		}
+		
+		s|Button.normal{
+			chromeColor: #96C03D;
+			fontFamily: opensans;
+		}
+		
+		s|Button.practicing{
+			chromeColor: #913700;
+			fontFamily: opensans;
+		}
+		
+		s|Button.choice{
+			color: #16747B;
+		}
+		
+		s|Button:up { chromeColor: #96C03D;
+			color: #000000;
+			kerning:on
+		}
+		
+		s|Button:up.navigation{
+			chromeColor: #D5D5D5;
+			color: #000000;
+			kerning:on
+		}
+		
+		s|Button:up.choice{
+			color: #16747B;
+		}
+		
+		s|Button:down { chromeColor: #7D5177;
+			kerning:on;
+			color: #FFFFFF }
+		
+		s|Button:down.navigation{
+			chromeColor: #7D5177;
+			color: #FFFFFF;
+			kerning:on
+		}
+		
+		s|Button:down.choice{
+			color: #000000;
+		}
+		
+		s|ToggleButton:upAndSelected,
+		s|ToggleButton:overAndSelected,
+		s|ToggleButton:disabledAndSelected,
+		s|ToggleButton:downAndSelected{
+			chromeColor:#7D5177;
+			color: #FFF;
+			icon: Embed("./icons/tick-22.png"); 
+			labelPlacement:right
+		} 
+		
+		s|ToggleButton{
+			chromeColor:#6E6E6E;
+			color: #FFF;
+			fontFamily: opensans;
+		} 
+		
+		
+		
+		s|Label{
+			fontFamily: opensanscff;
+		}
+		
+		.bold{
+			fontFamily: opensansboldcff;
+		}
+		
+		
+		.titlestyle{
+			color: #FFF;
+			fontFamily: opensansboldcff;
+			
+		}
+		
+		.teststyle{
+			backgroundColor: #ff0000;
+			
+		}
+		
+		s|TextInput
+		{
+			/* skinClass:ClassReference("au.edu.une.ruralmed.components.skins.AdamsTextInputSkin"); */
+			showPromptWhenFocused: false;
+			
+		}
+		
+		.searchfield{
+			icon:Embed("./icons/searchIcon.png"); 
+		}
+		
+		s|View {backgroundColor:#EEE;}
+		
+		@font-face { 
+			src:url("./fonts/OpenSansEmoji.ttf"); 
+			fontFamily: emojiCFFFont; 
+			embedAsCFF: true; 
+		} 
+		
+		.emojiCFFStyle { 
+			
+			fontFamily: emojiCFFFont; 
+		} 
+		
+/*		@font-face { 
+			src:url("../assets/MyriadWebPro.ttf"); 
+			fontFamily: myFontNoCFF; 
+			advancedAntiAliasing: true; 
+			embedAsCFF: false; 
+		} */
+	</fx:Style>
+	<s:ViewNavigator id="theview" width="100%" height="100%" />
+	
+	<fx:Script>
+		<![CDATA[
+			import au.com.clinman.events.LogonCompleteEvent;
+			import au.com.clinman.events.RecordPickEvent;
+			import au.com.clinman.mobile.lib.CustomUrlSchema;
+			import au.com.clinman.mobile.lib.FileIO;
+			import au.com.clinman.mobile.lib.Web_Service_Interface;
+			
+			import com.pialabs.eskimo.controls.SkinnableAlert;
+			
+			import components.FeedbackWaiter;
+			
+			import mx.events.FlexEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.rpc.http.HTTPService;
+			
+			import spark.transitions.SlideViewTransition;
+			import spark.transitions.ViewTransitionDirection;
+			
+			import views.ExaminationView;
+			import views.HomeView;
+			import views.LoginView;
+			import views.SetupView;
+			
+			/* 
+			* Embed some fonts 
+			*/
+			[Embed(source='./fonts/OpenSans-Regular.ttf', 
+        	fontName='opensans', 
+        	mimeType='application/x-font',
+        	embedAsCFF='false'
+     		)] 
+			private var font1:Class;
+			
+			[Embed(source='./fonts/OpenSans-Regular.ttf', 
+        	fontName='opensanscff', 
+        	mimeType='application/x-font',
+        	embedAsCFF='true'
+     		)] 
+			private var font2:Class;
+			
+			[Embed(source='./fonts/OpenSans-Bold.ttf', 
+        	fontName='opensansbold', 
+        	mimeType='application/x-font',
+        	embedAsCFF='false'
+     		)] 
+			private var font3:Class;
+			
+			[Embed(source='./fonts/OpenSans-Bold.ttf', 
+        	fontName='opensansboldcff', 
+        	mimeType='application/x-font',
+        	embedAsCFF='true'
+     		)] 
+			private var font4:Class;
+			
+			[Embed(source='./fonts/OpenSans-CondBold.ttf', 
+        	fontName='opensanscondensed', 
+        	mimeType='application/x-font',
+        	embedAsCFF='false'
+     		)] 
+			private var font5:Class;
+			
+		/*	[Embed(source='./fonts/OpenSansEmoji.ttf', 
+        	fontName='opensansemoji', 
+        	mimeType='application/x-font',
+        	embedAsCFF='false'
+     		)] 
+			private var font6:Class;*/
+			
+			// view transition
+			private var _goHomeTransition:SlideViewTransition = new SlideViewTransition();
+			
+			// the file IO library
+			private var _io:au.com.clinman.mobile.lib.FileIO = new au.com.clinman.mobile.lib.FileIO();
+			
+			// the web interface class
+			private var _webservice:Web_Service_Interface = new Web_Service_Interface();
+			
+			
+			private var _demomode:Boolean = false;
+			
+			private var _currentUserID:String = "";
+			
+			private var timeout:Number = 5000;
+			
+			private var _activated:Boolean = false;
+			
+			private var _fromwebsite:Boolean = false;
+			
+			protected function this_preinitializeHandler(event:FlexEvent):void
+			{
+				if(!_activated){
+					NativeApplication.nativeApplication.addEventListener(InvokeEvent.INVOKE, this_invokeHandler);
+				}
+			}
+			
+			// this triggers when the application is invoked from a website
+			protected function this_invokeHandler(event:InvokeEvent):void
+			{
+				trace('this_invokeHandler triggered');
+				// if this is true, we came in via website
+				if(event.arguments && event.arguments[0])
+				{
+					CustomUrlSchema.instance.parse(event.arguments[0]);
+					_fromwebsite = true;
+					//SkinnableAlert.show('this_invokeHandler says coming in via website:');
+					checkPath();
+				}else{
+					theview.addEventListener(FlexEvent.CREATION_COMPLETE, init);
+				}
+				
+				_activated = true;
+				//	
+			}
+			
+			
+			// the HTTPservice we'll use to check the path recieved from the website
+			private var _interfaceService:HTTPService = new HTTPService();
+			
+			// check the path provided by the website
+			private function checkPath():void{
+				//	SkinnableAlert.show('checkPath: checking '+CustomUrlSchema.instance.configurl);
+				dispatchEvent(new Event('WAIT_ON', true));
+				_interfaceService.requestTimeout = 15;
+				_interfaceService.request = new Object();
+				_interfaceService.url = CustomUrlSchema.instance.configurl;
+				_interfaceService.request.action = 'checksunbeam';
+				_interfaceService.request.app = 'true';
+				_interfaceService.resultFormat = 'text';
+				_interfaceService.method = 'POST';
+				_interfaceService.addEventListener( ResultEvent.RESULT, handleCheckMonitorStatusEvent );
+				_interfaceService.addEventListener( FaultEvent.FAULT, handleFault );
+				// execute the service
+				_interfaceService.send();
+			}
+			
+			private function handleCheckMonitorStatusEvent(e:ResultEvent):void{
+				dispatchEvent(new Event('WAIT_OFF', true));
+				_interfaceService.removeEventListener( ResultEvent.RESULT, handleCheckMonitorStatusEvent );
+				_interfaceService.removeEventListener( FaultEvent.FAULT, handleFault );
+				var resultXML:XML = new XML('<data/>');
+				try{
+					resultXML= XML(e.result.toString());
+					if(resultXML.sysname.toString().length>0){
+						_io.writeSetting('functionpath', CustomUrlSchema.instance.configurl);
+						_io.writeSetting('systemname', resultXML.sysname);
+						_io.writeSetting('firstrun', 'false');
+						_io.writeSetting('token', CustomUrlSchema.instance.token);
+						//	_io.writeSetting('currentuserID', resultXML.userID);
+						//_io.writeSetting('currentusername', resultXML.name);
+						_webservice.loggedIn = true;
+						//dispatchEvent(new Event('GO_HOME', true));
+						_webservice.monitor.available = true;
+					}
+				}catch(err:Error){
+					SkinnableAlert.show('Network Error:'+err.message.toString());
+				}
+				init();
+			}
+			
+			private function handleFault(e:FaultEvent):void{
+				dispatchEvent(new Event('WAIT_OFF', true));
+				_interfaceService.removeEventListener( ResultEvent.RESULT, handleCheckMonitorStatusEvent );
+				_interfaceService.removeEventListener( FaultEvent.FAULT, handleFault );
+				
+			}
+			
+			// init function
+			private function init(e:Event = null):void{
+			//	SkinnableAlert.show('init');
+				// set up view transitions
+				_goHomeTransition.direction = ViewTransitionDirection.RIGHT;
+				// set up navigation triggers
+				theview.addEventListener('GO_HOME', goHome);
+				theview.addEventListener('GO_SETUP', gotoSetup);
+				theview.addEventListener('GO_DEMO', goDemo);
+				theview.addEventListener('GO_LOGON', gotoLogon);
+				theview.addEventListener('WAIT_ON', waitOn);
+				theview.addEventListener('WAIT_OFF', waitOff);
+				// is this the first time this app has run? if so, trigger the setup view (unless we came in via a website)
+				if((_io.readSetting('firstrun')=='true')&&(!_fromwebsite)){
+					gotoSetup();
+				}else{
+					if(!_fromwebsite)
+					{
+						// opened natively (ie not from the website)
+						gotoLogon();
+					}
+					else
+					{					
+					//	SkinnableAlert.show('checking token:'+CustomUrlSchema.instance.token);
+						checkTokenFromURL(CustomUrlSchema.instance.token);
+					} 
+					
+				}				
+			}
+			
+			
+			// check teh stored token to see if it's still valid
+			private function checkTokenFromURL(token:String):void{
+				waitOn();
+				//_webservice.resetMonitor();
+				_webservice.addEventListener(LogonCompleteEvent.COMPLETE, handleCheckToken);
+				_webservice.addEventListener(FaultEvent.FAULT, handleFault);
+				_webservice.checkToken(token);
+				
+				
+			}
+			// check teh stored token to see if it's still valid
+			private function checkToken(token:String):void{
+				_webservice.removeEventListener("MONITOR_STATUS_CHANGE", checkToken);
+				if(_webservice.monitor.available){
+					//	if(_io.readSetting('token').length>0){
+					waitOn();
+					//_webservice.resetMonitor();
+					_webservice.addEventListener(LogonCompleteEvent.COMPLETE, handleCheckToken);
+					_webservice.addEventListener(FaultEvent.FAULT, handleFault);
+					_webservice.checkToken(token);
+					//}else{
+					//	gotoLogon();
+					//}
+					//}else{
+					//gotoLogon();
+				}
+			}
+			
+			// handle the result of the check token event.
+			private function handleCheckToken(e:LogonCompleteEvent):void{
+				waitOff();
+				// remove event handlers
+				_webservice.removeEventListener(LogonCompleteEvent.COMPLETE, handleCheckToken);
+				_webservice.removeEventListener(FaultEvent.FAULT, handleCheckTokenFault);
+				// if there's an error (probably expired token), go to logon
+				if(e.results.error.length()>0){
+					gotoLogon()
+				}else{
+					//_webservice.io.writeSetting('token', e.results.token);
+					_webservice.io.writeSetting('currentuserID', e.results.userID);
+					_webservice.io.writeSetting('currentusername', e.results.name);
+					_webservice.io.writeSetting('token', CustomUrlSchema.instance.token);
+					_webservice.loggedIn = true;
+					goHome();
+				}
+			}
+			
+			// handle a login fault
+			private function handleCheckTokenFault(e:FaultEvent):void{
+				waitOff();
+				_webservice.removeEventListener(LogonCompleteEvent.COMPLETE, handleCheckToken);
+				_webservice.removeEventListener(FaultEvent.FAULT, handleCheckTokenFault);
+				SkinnableAlert.show('Network error...');
+				gotoLogon();
+			}
+			
+			// go to the logon view
+			private function gotoLogon(e:Event = null):void{
+				_demomode = false;
+				theview.actionBar.setStyle('chromeColor', '#3D3E3F');
+				var data:Object = new Object();
+				this._webservice.io = this._io;
+				//data.io = _io;
+				data.webservice = this._webservice;
+				theview.pushView(LoginView, data);
+			}
+			
+			// go to the home view
+			private function goHome(e:Event = null):void{
+				var data:Object = new Object();
+				data.demomode = _demomode;
+				this._webservice.io = this._io;
+				//data.io = _io;
+				data.webservice = this._webservice;
+				theview.pushView(HomeView, data, null, _goHomeTransition);
+				// add a listener for the selection of an examination (broadcast as an event))
+				theview.addEventListener(RecordPickEvent.EVENT, handleExamRecordPickEvent)
+			}
+			
+			// go to the setup view
+			private function gotoSetup(e:Event = null):void{
+				trace('going to setup')
+				var data:Object = new Object();
+				this._webservice.io = this._io;
+				//data.io = _io;
+				data.webservice = this._webservice;
+				theview.pushView(SetupView, data);
+			}
+			
+			// handle the selection of an examination (broadcast as an event))
+			private function handleExamRecordPickEvent(e:RecordPickEvent):void{
+				var data:Object = new Object();
+				data.demomode = _demomode;
+				this._webservice.io = this._io;
+				//data.io = _io;
+				data.webservice = this._webservice;
+				data.examID = e.recordID;
+				// go to the examination view
+				theview.pushView(ExaminationView, data);
+				// remove the event
+				theview.removeEventListener(RecordPickEvent.EVENT, handleExamRecordPickEvent)
+			}
+			
+			
+			private function goDemo(e:Event = null):void{
+				this._demomode = true;
+				
+				theview.actionBar.setStyle('chromeColor', '#C24641');
+				goHome();
+			}
+			
+			
+			///////////////////////////////////////////////////////////////////////////////////////
+			//UI feedback
+			///////////////////////////////////////////////////////////////////////////////////////
+			
+			private var _busy_indicator:FeedbackWaiter = new FeedbackWaiter();
+			
+			
+			private var waiting:Boolean = false;
+			
+			private function waitOn(e:Event = null):void{
+				if(!waiting){
+					
+					this.alpha = 0.2;
+					_busy_indicator.labelText = 'Processing...';
+					PopUpManager.addPopUp(_busy_indicator, this.getChildAt(this.numChildren-1), true);
+					PopUpManager.centerPopUp(_busy_indicator);
+					waiting = true;
+					
+				}
+			}
+			
+			private function waitOff(e:Event = null):void{
+				if(waiting){
+					this.alpha = 1;
+					PopUpManager.removePopUp(_busy_indicator);
+					waiting = false;
+				}
+			}
+			
+			
+			
+		]]>
+	</fx:Script>
+</s:Application>

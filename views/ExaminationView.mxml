@@ -1,0 +1,931 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:View xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		xmlns:s="library://ns.adobe.com/flex/spark" creationComplete="view1_creationCompleteHandler(event)" xmlns:components="components.*" xmlns:lib="au.com.clinman.mobile.lib.*" xmlns:ns="http://flex.apache.org/experimental/ns">
+	<s:titleContent>
+		<s:Label width="100%" textAlign="center" styleName="titlestyle" text="{_examinationName+'\r'}{_loadedStudentName}"/>
+	</s:titleContent>
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+		
+	</fx:Declarations>
+	
+	<s:states>
+		<s:State name="overall_view"/>
+		<s:State name="assessment_view"/>
+		<s:State name="rating_view"/>
+	</s:states> 
+	<s:transitions>
+		<s:Transition fromState="*" toState="*">
+			<s:Sequence targets="{[overall_view, assessment_view, rating_view]}">
+				<s:Fade duration="300" startDelay="0"/>
+			</s:Sequence>
+		</s:Transition>
+	</s:transitions>
+	<fx:Script>
+		<![CDATA[
+			import com.hurlant.util.Base64;
+			import com.pialabs.eskimo.controls.SkinnableAlert;
+			
+			import mx.collections.ArrayCollection;
+			import mx.collections.ArrayList;
+			import mx.collections.XMLListCollection;
+			import mx.events.CloseEvent;
+			import mx.events.FlexEvent;
+			import mx.managers.PopUpManager;
+			import mx.rpc.events.FaultEvent;
+			import mx.utils.Base64Encoder;
+			
+			import spark.components.ButtonBarButton;
+			import spark.components.LabelItemRenderer;
+			import spark.components.supportClasses.ItemRenderer;
+			import spark.events.PopUpEvent;
+			
+			import au.com.clinman.events.GetExamsForUserCompleteEvent;
+			import au.com.clinman.events.GetMarkingSheetDefinitionCompleteEvent;
+			import au.com.clinman.events.MakeCommentEvent;
+			import au.com.clinman.events.MarkQuestionEvent;
+			import au.com.clinman.events.StartCommentEvent;
+			import au.com.clinman.events.eOSCEErrorEvent;
+			import au.com.clinman.mobile.lib.FileIO;
+			import au.com.clinman.mobile.lib.Web_Service_Interface;
+			import au.com.clinman.utils.XMLUtils;
+			
+			import components.AssessmentItemRenderer;
+			import components.CommentEntry;
+			import components.CriteriaExplanation;
+			import components.StudentPicker;
+			
+			import utils.string.htmlEncode;
+			
+			// preallocate an iterator
+			private var _i:int = 0;
+			
+			// the current exam ID
+			private var _examID:String = "";
+			
+			// the loaded examination name- bound to a displayed label
+			[Bindable]
+			private var _examinationName:String = "";
+			
+			// the loaded student name- bound to a displayed label
+			[Bindable]
+			private var _loadedStudentName:String = "";
+			
+			// teh currently loaded exam definition XML- we get this from teh web service
+			private var _currentExamDefinition:XML = new XML();
+			
+			// the rating scale that this examination will use (passed to the MobileAssessmentRenderer
+			private var _currentExamRatingScale:XML;
+			private var _currentExamRatingScaleList:XMLList;
+			
+			public function get currentExamRatingScaleList():XMLList
+			{
+				return _currentExamRatingScaleList;
+			}
+			
+			
+			// the XMLList of the assessment questions 
+			[Bindable]
+			private var _currentAssessmentDataXMLList:XMLList = new XMLList();
+			
+			// an XMLListCollection based on the above. This is to bind with the assessment list
+			[Bindable]
+			private var _currentAssessmentData:XMLListCollection = new XMLListCollection();
+			
+			// the web service interface library			
+			private var _webservice:Web_Service_Interface;
+			
+			// a UI component to select a student
+			private var _studentPicker:StudentPicker = new StudentPicker();
+			
+			// Data for the currently loaded student 
+			[Bindable]
+			private var _currentStudentData:XML = new XML();
+			
+			// Preallocate an overall rating value- to be sent 
+			[Bindable]
+			private var _overall_rating_value:int = -1;
+			
+			// Preallocate an additional rating value- to be sent 
+			[Bindable]
+			private var _additional_rating_value:int = -1;
+			
+			// has an essential criteria been failed?	
+			[Bindable]
+			private var _instafail:Boolean = false;
+			
+			[Bindable]
+			private var _demomode:Boolean = false;
+			
+			private var _inError:Boolean = false;
+			// set the data for this view. This is how we pass data from the main app to this view. This is called before anything else
+
+			
+			override public function set data(value:Object):void{
+				super.data = value;
+				_inError = false;
+				this._demomode = value.demomode;
+				this._webservice = value.webservice;
+				if(!_demomode){
+					this._webservice.addEventListener("MONITOR_STATUS_CHANGE", handleNetworkStatusChange);
+					network_disconnect.visible = !_webservice.monitor.available;
+					this._examID = value.examID;
+					this._webservice.addEventListener(FaultEvent.FAULT, handleWebserviceError);
+					this._webservice.addEventListener(eOSCEErrorEvent.EVENT, handleeEOSCEErrorEvent); 
+				
+				}
+			}
+			
+			// When the view is loaded...
+			protected function view1_creationCompleteHandler(event:FlexEvent):void
+			{
+				// set some defauls
+				studentNameDisp.text = "(no student loaded)";
+				studentIDDisp.text = "(no student loaded)";
+				student_img.source = 'icons/unknown-person.jpg';
+				// load the examination definition
+				if(!_demomode){
+					_webservice.addEventListener(GetMarkingSheetDefinitionCompleteEvent.DATA_READY, handleGetMarkingSheetDefinitionResultCompleteEvent);
+					_webservice.getMarkingSheetDefinition(_examID, this._webservice.io.readSetting('token'));
+				}else{
+					_currentExamDefinition = _webservice.io.demoXML.exam_cache.instance[0];
+					//trace('loading as demo:'+_currentExamDefinition);
+					_currentExamRatingScale = XML(_currentExamDefinition.scale);
+					_currentExamRatingScaleList = _currentExamRatingScale.children();
+					_currentAssessmentDataXMLList = _webservice.io.demoXML.exam_cache.instance[0].questiondata.children().copy();
+					_currentAssessmentData = new XMLListCollection(_currentAssessmentDataXMLList);
+					
+					_currentAssessmentDataXMLList = _currentExamDefinition.questiondata.children().copy();
+					_examinationName = _webservice.io.demoXML.exam_cache.instance[0].name.toString();
+					_itemsList.addEventListener(MarkQuestionEvent.EVENT, markQuestion);
+					//_itemsList.addEventListener(MakeCommentEvent.EVENT, makeComment);
+					_itemsList.addEventListener(StartCommentEvent.EVENT, openCommentPopup);
+					_itemsList.dataGroup.invalidateDisplayList();
+				}
+				
+			}
+			
+			// handle getting the marking sheet definition
+			private function handleGetMarkingSheetDefinitionResultCompleteEvent(e:GetMarkingSheetDefinitionCompleteEvent):void{
+				trace(e.results);
+				_currentExamDefinition = e.results;
+				_currentExamRatingScale = XML(_currentExamDefinition.scale);
+				_currentExamRatingScaleList = _currentExamRatingScale.children();
+				_currentAssessmentDataXMLList = _currentExamDefinition.questiondata.children().copy();
+				_currentAssessmentData = new XMLListCollection(_currentAssessmentDataXMLList);
+				_examinationName = _currentExamDefinition.name.toString();
+				_itemsList.addEventListener(MarkQuestionEvent.EVENT, markQuestion);
+				//_itemsList.addEventListener(MakeCommentEvent.EVENT, makeComment);
+				_itemsList.addEventListener(StartCommentEvent.EVENT, openCommentPopup);
+				_itemsList.dataGroup.invalidateDisplayList();
+				// if it's a practice session, we change the title bar colour and add 'Practicing' to the end of the title
+				if(_currentExamDefinition.practicing.toString()=='true'){
+					this.parentApplication.theview.actionBar.setStyle('chromeColor', '#B37500');
+					_examinationName+=' (Practice)';
+				}
+				// check that there's not already a student loaded for this exam, that hasn't already finished (use case: tech failure, app crash)
+				checkForLoadedStudent();
+			}
+			
+			// is there already a student started for this? If so, reload the data
+			private function checkForLoadedStudent():void{
+				
+				// get the cached exam data (if any)
+				var _currentCachedExamData:XML = _webservice.io.checkForCurrentUnfinishedExam(_examID);
+				// if there's something in there with a student ID in it...
+				if(_currentCachedExamData.hasOwnProperty('studentid')){
+					trace('ExaminationView.checkForLoadedStudent says there is a current student: with id:'+_currentCachedExamData.studentid)
+					// check that this student is still valid
+					_currentStudentData = _webservice.io.get_student_from_cache(_currentCachedExamData.studentid, _examID);
+					if(_currentStudentData.hasOwnProperty('id')){
+						studentNameDisp.text = _currentStudentData.fname+' '+_currentStudentData.lname;
+						_loadedStudentName = 'Candidate: '+_currentStudentData.fname+' '+_currentStudentData.lname;
+						studentNameDisp.text = _loadedStudentName;
+						studentIDDisp.text = _currentStudentData.studentnum;
+						student_img.source = _webservice.monitor.available?_webservice.io.readSetting('functionpath')+'?app=true&action=showstudentimage&studentid='+_currentStudentData.id+'&getbig=true&token='+_webservice.io.readSetting('token'):'icons/unknown-person.jpg';
+						
+						gotoAssessmentBut.visible = true;
+						trace('ExaminationView.checkForLoadedStudent says there is a current student: _currentAssessmentData is:'+_currentCachedExamData.questiondata);
+						_currentAssessmentData = new XMLListCollection(_currentCachedExamData.questiondata.children());
+						validate_criteria();
+						if(!signature_area.hasEventListener('ACTIVITY')){
+							signature_area.addEventListener('ACTIVITY', validate_rating);
+						}
+					}
+				}
+				
+			}
+			
+			
+			// select student via a popup
+			private function selectStudent():void{
+				if(_currentStudentData.hasOwnProperty('studentnum')){
+					SkinnableAlert.show("Do you really want to change the loaded student?\r\nYou will lose any recorded data for the currently loaded student", "Really?", SkinnableAlert.YES|SkinnableAlert.NO, this, handleStudentWarningCloseEvent)
+				}else{
+					_studentPicker.webservice = this._webservice;
+					_studentPicker.demomode = this._demomode;
+					_studentPicker.formid = this._examID;
+					_studentPicker.addEventListener(PopUpEvent.CLOSE, handleSelectStudentClose);
+					_studentPicker.addEventListener(PopUpEvent.OPEN, handleSelectStudentOpen);
+					_studentPicker.open(this, true);
+				}
+				
+			}
+			
+			// handle the student selection warning close event
+			private function handleStudentWarningCloseEvent(e:CloseEvent):void{
+				
+				if(e.detail==SkinnableAlert.YES){
+					unloadStudent();
+					_studentPicker.addEventListener(PopUpEvent.CLOSE, handleSelectStudentClose);
+					_studentPicker.addEventListener(PopUpEvent.OPEN, handleSelectStudentOpen);
+					_studentPicker.webservice = this._webservice;
+					_studentPicker.formid = this._examID;
+					_studentPicker.open(this, true);
+				}
+			}
+			
+			// a bit of practicality: move the control up to the top, as the keyboard gets in the way
+			private function handleSelectStudentOpen(e:PopUpEvent):void{
+				PopUpManager.centerPopUp(_studentPicker);
+				_studentPicker.move(_studentPicker.x, 100);
+			}
+			
+			// load the student details into memory, and show the student data
+			private function handleSelectStudentClose(e:PopUpEvent):void{
+				
+				if(e.commit){
+					// is there a loaded student? if so, unload but check first
+					if(_currentStudentData!=e.data){
+						unloadStudent();
+					}
+					_currentStudentData = e.data;
+					studentNameDisp.text = _currentStudentData.fname+' '+_currentStudentData.lname;
+					studentIDDisp.text = _currentStudentData.studentnum;
+					_loadedStudentName = 'Candidate: '+_currentStudentData.fname+' '+_currentStudentData.lname;
+					
+					if(!_demomode){
+						if(_webservice.monitor.available){
+							trace('handleSelectStudentClose says webservice is available');
+							dispatchEvent(new Event('WAIT_ON', true));
+						}	
+						student_img.source = (_webservice.monitor.available?(_webservice.io.readSetting('functionpath')+'?app=true&action=showstudentimage&studentid='+_currentStudentData.id+'&getbig=true&token='+_webservice.io.readSetting('token')):'icons/unknown-person.jpg');
+					}else{
+						
+						student_img.source = 'icons\/demo\/'+_currentStudentData.image.toString();
+					}
+					
+					gotoAssessmentBut.visible = true;
+					if(!signature_area.hasEventListener('ACTIVITY')){
+						signature_area.addEventListener('ACTIVITY', validate_rating);
+					}
+					//selectStudentBut.visible = true;
+				}
+			}
+			
+			
+			
+			//unload a student
+			private function unloadStudent():void{
+				if(_webservice.io.removeAnswerCache(_currentStudentData.id, _examID)){
+					// unload student details
+					
+					_currentStudentData = new XML();
+					studentNameDisp.text = "(no student loaded)";
+					studentIDDisp.text = "(no student loaded)";
+					_loadedStudentName = "(no student loaded)";
+					student_img.source = 'icons/unknown-person.jpg';
+					
+					// clear assessment data
+					_currentAssessmentDataXMLList = _currentExamDefinition.questiondata.children().copy();
+					_currentAssessmentData = new XMLListCollection(_currentAssessmentDataXMLList);
+					_currentAssessmentData.refresh();
+					
+					// clear overall data
+					this.overall_but0.selected = false;
+					this.overall_but1.selected = false;
+					this.addidional_but0.selected = false;
+					this.addidional_but1.selected = false;
+					this.addidional_but2.selected = false;
+					
+					_overall_rating_value = -1;
+					
+					// clear comments
+					additional_comments.text = "";
+					
+					// reset signature
+					signature_area.erase(); 
+					
+					// reset validation
+					validate_rating();
+					
+					save_but.enabled = false;
+					
+					// reset view
+					gotoAssessmentBut.visible = false;
+					selectStudentBut.visible = true;
+					changeViewTo('overall_view');
+				}
+			}
+			
+			
+			// start the exam, cache the data 
+			private function startExam():void{
+				// get start time
+				var now:Date = new Date();
+				var unixnow:Number = Math.round(now.time/1000);
+				// reset current assessment data
+				
+				// start cache of answers
+				if(!_demomode){
+					_webservice.io.startAnswerCache("<exam><examid>"+_examID+"</examid><studentid>"+_currentStudentData.id+"</studentid><started>"+unixnow.toString()+"</started><completed/><completedat/><overall_rating/><additional_rating/><overall_comments/><questiondata>"+(_currentExamDefinition.questiondata.children().toString())+"</questiondata><practicing>"+_currentExamDefinition.practicing.toString()+"</practicing></exam>", _currentStudentData.id, _currentExamDefinition.id);
+				}
+			}
+			
+			
+			// mark and store a question
+			private function markQuestion(e:MarkQuestionEvent):void{
+				_instafail = false;
+				var itemid:String = e.questionID;
+				_currentAssessmentData.source.(@id==e.questionID).value=e.value;
+				//	trace('marking something:'+_currentAssessmentData.source.(@id==e.questionID))
+				var valid:Boolean = false;
+				//trace('marking question ID '+e.questionID+' to value ' +e.value);
+				for each (var scaleitem : XML in _currentExamRatingScaleList) {
+					if(e.value.toString()==scaleitem.value.toString()){
+						if(scaleitem.needs_comment.toString()=='true'){
+							valid =  _currentAssessmentData.source.(@id==e.questionID).comment.toString().length>0;
+						}else{
+							valid =  true;
+						}
+						
+					}
+
+				}
+				
+				_currentAssessmentData.source.(@id==e.questionID).isvalid= (valid?'true':'false');
+				
+				
+				//_currentAssessmentData.refresh();
+				
+				//(_itemsList.dataProvider as XMLListCollection).refresh();
+				// save question data to file
+				if(!_demomode){
+					_webservice.io.updateAnswerCache('<questiondata>'+_currentAssessmentData.source.toString()+'</questiondata>', _currentStudentData.id, _examID) ;
+				}
+				validate_criteria();
+			}
+			
+			
+			
+			private var _commentPopup:CommentEntry = new CommentEntry();
+			private function openCommentPopup(e:StartCommentEvent):void{
+				trace('setting text to:'+e.value)
+				_commentPopup.text = e.value;
+				
+				_commentPopup.questionID = e.questionID;
+				
+				_commentPopup.addEventListener(PopUpEvent.OPEN, handleCommentPopupOpen);
+				_commentPopup.addEventListener(PopUpEvent.CLOSE, handleCommentPopupClose);
+				_commentPopup.open(this, true);
+				
+			}
+			
+			// a bit of practicality: move the control up to the top, as the keyboard gets in the way
+			private function handleCommentPopupOpen(e:PopUpEvent):void{
+				_commentPopup.removeEventListener(PopUpEvent.OPEN, handleCommentPopupOpen);
+				PopUpManager.centerPopUp(_commentPopup);
+				_commentPopup.move(_commentPopup.x, 50);
+			}
+			
+			
+			private function handleCommentPopupClose(e:PopUpEvent):void{
+				_commentPopup.removeEventListener(PopUpEvent.CLOSE, handleCommentPopupClose);
+				var itemid:String = e.data[0];
+				_currentAssessmentData.source.(@id==itemid).comment=htmlEncode(e.data[1]);
+				
+				trace('committing comment:'+e.data[1]);
+				for each (var scaleitem : XML in _currentExamRatingScaleList) {
+					//trace(scaleitem.toString())
+					trace('value is:'+_currentAssessmentData.source.(@id==itemid).value.toString())
+					trace('scaleitem is:'+scaleitem.value)
+					if(_currentAssessmentData.source.(@id==itemid).value.toString().length>0){
+						if ((scaleitem.needs_comment.toString()=='true')&&(_currentAssessmentData.source.(@id==itemid).value.toString()==scaleitem.value.toString())){
+							if (_currentAssessmentData.source.(@id==itemid).comment.toString().length>0){
+								_currentAssessmentData.source.(@id==itemid).isvalid='true';
+							}else{
+								_currentAssessmentData.source.(@id==itemid).isvalid='false';
+							}	
+						}else{
+							_currentAssessmentData.source.(@id==itemid).isvalid='true';
+						}
+					}else{
+						_currentAssessmentData.source.(@id==itemid).isvalid='false';
+					}
+				}
+				
+				
+				if(!_demomode){
+					_webservice.io.updateAnswerCache('<questiondata>'+_currentAssessmentData.source.toString()+'</questiondata>', _currentStudentData.id, _examID) ;
+				}
+				validate_criteria();
+			}
+			
+			// handle selection of overall marks
+			private function handleOverallRatingClick(event:MouseEvent, value:int):void{
+				if(event.target == this.overall_but0){
+					this.overall_but0.selected = true;
+					this.overall_but1.selected = false;
+				}else{
+					this.overall_but1.selected = true;
+					this.overall_but0.selected = false;
+				}
+				_overall_rating_value = value;
+				validate_rating()
+			}
+			
+			
+			// handle selection of overall marks
+			private function handleAdditionalRatingClick(event:MouseEvent, value:int):void{
+				switch(event.target)
+				{
+					case this.addidional_but0:
+					{
+						this.addidional_but0.selected = true;
+						this.addidional_but1.selected = false;
+						this.addidional_but2.selected = false;
+						break;
+					}
+					case this.addidional_but1:
+					{
+						this.addidional_but1.selected = true;
+						this.addidional_but0.selected = false;
+						this.addidional_but2.selected = false;
+						break;
+					}
+					case this.addidional_but2:
+					{
+						this.addidional_but2.selected = true;
+						this.addidional_but1.selected = false;
+						this.addidional_but0.selected = false;
+						break;
+					}
+					default:
+					{
+						this.addidional_but2.selected = true;
+						this.addidional_but1.selected = false;
+						this.addidional_but0.selected = false;
+						break;
+					}
+				}
+				_additional_rating_value = value;
+				validate_rating()
+			}
+			
+		
+			// validate the criteria view
+			private var __latch:Boolean = false;
+			private function validate_criteria():Boolean{
+			//	trace(_currentAssessmentData.source);
+				var isthisvalid:Boolean = true;
+				
+				_instafail = false;
+				for (var assessmentitem:Object in _currentAssessmentData.source){
+					if(_currentAssessmentData.source[assessmentitem].hasOwnProperty('isvalid')){
+						if(_currentAssessmentData.source[assessmentitem].isvalid.toString()=='false'){
+							isthisvalid= false;
+						}
+					}else{
+						isthisvalid= false;
+					}
+					// check instafail criteria
+					if(_currentAssessmentData.source[assessmentitem].type.toString()=='1'){
+						if(_currentAssessmentData.source[assessmentitem].value.toString()=='0'){
+							_instafail = true;
+							this.overall_but1.selected = true;
+							this.overall_but0.selected = false;
+							_overall_rating_value = 0;
+						}
+					}
+				}
+				//trace('instafail?'+_instafail);
+								
+				// if we've moved from an instafail condition to non, reset subjective marks...
+			//	trace(!_instafail&&__latch)
+				if(!_instafail&&__latch){
+					this.overall_but1.selected = false;
+					this.overall_but0.selected = false;
+					_overall_rating_value = -1;
+				}
+				
+				__latch = _instafail;
+						
+				gotoRatingBut.visible = isthisvalid;
+				return isthisvalid;
+			}
+			
+		
+			
+			// validate teh ratings page
+			private function validate_rating(e:Event = null):void{
+			
+				if(validate_criteria()){
+					overallratingcolour.color =(_overall_rating_value<0)?uint('0xFFC8C8'):uint('0xC8FFC8');
+					overallratingcolour2.color =(_overall_rating_value<0)?uint('0xFFC8C8'):uint('0xC8FFC8');
+					additional_comments.setStyle('contentBackgroundColor', '0xFFC8C8');
+					additional_comments_colour.color = uint(0xFFC8C8);
+					if((_overall_rating_value==0)){
+						if(additional_comments.text.length<3){
+							additional_comments.setStyle('contentBackgroundColor', '0xFFC8C8');
+							additional_comments_colour.color = uint(0xFFC8C8);
+						}else{
+							additional_comments.setStyle('contentBackgroundColor', '0xC8FFC8');
+							additional_comments_colour.color = uint(0xC8FFC8);
+						}
+					}
+					if((_overall_rating_value==1)){
+						additional_comments.setStyle('contentBackgroundColor', '0xC8FFC8');
+						additional_comments_colour.color = uint(0xC8FFC8);
+					}
+					
+					if((_additional_rating_value<0)){
+						additionalratingcolour.color = uint(0xFFC8C8);
+						additionalratingcolour2.color = uint(0xFFC8C8);
+					}else{
+						additionalratingcolour.color = uint(0xC8FFC8);
+						additionalratingcolour2.color = uint(0xC8FFC8);
+					}
+					
+					if(!signature_area.hascontent){
+						signature_area_colour.color = uint(0xFFC8C8);
+						signature_area_colour2.color = uint(0xFFC8C8);
+					}else{
+						signature_area_colour.color = uint(0xC8FFC8);
+						signature_area_colour2.color = uint(0xC8FFC8);
+					}
+					
+					
+					if (_overall_rating_value >-1) {
+						if ((((_overall_rating_value==1) && (_additional_rating_value>-1)) || ((_overall_rating_value==0)&&(additional_comments.text.length>3)))&&signature_area.hascontent) {
+							save_but.enabled = true;
+							/* 	additional_comments.setStyle('contentBackgroundColor', '0xC8FFC8');
+							additional_comments_colour.color = uint(0xC8FFC8); */
+						} else {
+							save_but.enabled = false;
+						}
+					} else {
+						
+						save_but.enabled = false;
+					}
+					
+					if(additional_comments.text.indexOf("\r") != -1 || additional_comments.text.indexOf("\n") != -1)
+					{
+						// fix newlines
+						additional_comments.text = additional_comments.text.replace(/[\r\n]/g, "");
+						stage.focus = null; 
+						//e.preventDefault();
+					}
+					
+				}
+			}
+			
+			
+			
+			// submit the actual assignment (whole assessment- we're not logging fine details with this app)
+			private var xmlutils:XMLUtils = new XMLUtils();
+			private function submitAssessment():void{
+				if(!_demomode){
+					dispatchEvent(new Event('WAIT_ON', true));
+					var assessmentdata:String = '<data><answers>';
+					for (var assessmentitem:Object in _currentAssessmentData.source){
+						assessmentdata += '<answer><question_id>'+_currentAssessmentData.source[assessmentitem].id.toString() + '</question_id><value>' +_currentAssessmentData.source[assessmentitem].value.toString()+'</value><comment>' + htmlEncode(_currentAssessmentData.source[assessmentitem].comment.toString())+ '</comment></answer>'; 
+					}
+					assessmentdata += '</answers></data>';
+					_webservice.addEventListener('SUBMIT_SUCCESS', handlesubmitAssessmentSuccess);
+					var signatureImage:ByteArray = signature_area.save(); 
+					//var imagedataStr:String = Base64.encodeByteArray(signatureImage);
+					//trace('signature image in ExaminationView/submitAssessment is:'+imagedataStr);
+					//_currentStudentData
+					var imagedataStr:String = Base64.encodeByteArray(signatureImage);
+					_webservice.submitAssessment(_currentStudentData.id, _examID, _webservice.io.readSetting('currentuserID'), _currentStudentData.siteid, _overall_rating_value.toString(), _additional_rating_value.toString(), assessmentdata, htmlEncode(additional_comments.text), imagedataStr, _currentExamDefinition.practicing.toString(), this._webservice.io.readSetting('token'));
+				}else{
+					SkinnableAlert.show("Submission success", "Yay!")
+					unloadStudent();
+				}
+			}
+			
+			private function handlesubmitAssessmentSuccess(e:Event):void{
+				// reset form here
+				trace('handlesubmitAssessmentSuccess fired');
+				_webservice.removeEventListener('SUBMIT_SUCCESS', handlesubmitAssessmentSuccess);
+				dispatchEvent(new Event('WAIT_OFF', true));
+				SkinnableAlert.show("Submission success", "Yay!")
+				unloadStudent();
+			}
+			
+			private function handleeEOSCEErrorEvent(e:eOSCEErrorEvent):void{
+				if(_webservice.hasEventListener('SUBMIT_SUCCESS')){
+					_webservice.removeEventListener('SUBMIT_SUCCESS', handlesubmitAssessmentSuccess);
+				}
+				dispatchEvent(new Event('WAIT_OFF', true));
+				SkinnableAlert.show(e.message, "Submission Failed")
+				unloadStudent();
+			}
+			
+			private function cancelExam():void{
+				SkinnableAlert.show("Do you really want to cancel this assessment?", "Really?", SkinnableAlert.YES|SkinnableAlert.NO, this, handleCancelExamCloseEvent)
+			}
+			
+			private function handleCancelExamCloseEvent(e:CloseEvent):void{
+				if(e.detail==SkinnableAlert.YES){
+					// TODO clean up current assessment, then go home
+					dispatchEvent(new Event('GO_HOME', true));
+				}
+			}
+			
+			private function handleWebserviceError(e:FaultEvent):void{
+				try{
+					_webservice.removeEventListener(GetMarkingSheetDefinitionCompleteEvent.DATA_READY, handleGetMarkingSheetDefinitionResultCompleteEvent);
+					_webservice.removeEventListener(FaultEvent.FAULT, handleWebserviceError); 
+				}catch(e:Error){}
+				try{
+					_webservice.removeEventListener('SUBMIT_SUCCESS', handlesubmitAssessmentSuccess);
+					_webservice.removeEventListener(FaultEvent.FAULT, handleWebserviceError); 
+				}catch(e:Error){}
+				
+				dispatchEvent(new Event('WAIT_OFF', true));
+				if(!_inError){
+					_inError = true
+					SkinnableAlert.show(e.message.body.toString(), "Network error!",SkinnableAlert.OK, this, handleErrorCloseEvent)
+				}
+			}
+			
+			
+			private function handleErrorCloseEvent(e:CloseEvent):void{
+				this._webservice.io.writeSetting('token', '');
+				
+				dispatchEvent(new Event('GO_LOGON', true));
+			}
+			
+			/**
+			 * Change the view
+			 * */
+			private function changeViewTo(viewname:String):void {		
+			
+				currentState =viewname;
+				
+			}
+			
+			private function handleNetworkStatusChange(e:Event):void{
+				network_disconnect.visible = !_webservice.monitor.available;
+			}
+			
+			private var _explanationDisplay:CriteriaExplanation = new CriteriaExplanation();
+			private function showCriteriaExplanation():void{
+				//_explanationDisplay.addEventListener(PopUpEvent.OPEN, function():void{
+					_explanationDisplay.explanationData = _currentExamRatingScale;	
+				//});
+				_explanationDisplay.open(this, true);
+				PopUpManager.centerPopUp(_explanationDisplay);
+			}
+			
+		]]>
+	</fx:Script>
+	<s:Group id="overall_view" height="100%" visible="true" visible.assessment_view="false" visible.overall_view="true" visible.rating_view="false" width="100%">
+		
+		<s:HGroup width="100%" left="10" right="10" top="20">
+			<s:VGroup  height="100%" width="40%" verticalAlign="middle">
+				
+				<s:Group width="100%" height="100%">
+					
+					<s:Rect width="100%" height="100%"> 
+						<s:fill>
+							<s:SolidColor color="0xffffff"/>
+						</s:fill>
+						<s:stroke>
+							<s:SolidColorStroke color="0xB7B7B7" weight="5"/>
+						</s:stroke>
+					</s:Rect>			
+					
+					<s:VGroup height="100%" width="100%" paddingLeft="10">
+						<s:Spacer height="10"/>
+						<s:Label text="Loaded candidate:" fontSize="26" styleName="bold"  color="#7D5177"/>
+						<s:Label text="Student Name:" fontSize="20"/>
+						<s:Label id="studentNameDisp" text="{_loadedStudentName}"/>
+						<s:Label text="Student ID:"  fontSize="20"/>
+						<s:Label id="studentIDDisp" text="{}"/>
+						<s:Spacer height="100%"/>
+						<s:HGroup width="100%">
+							<s:Button label="{_currentStudentData.hasOwnProperty('studentnum')?'Change candidate':'Select candidate'}" width="100%" height="40" skinClass="au.edu.une.ruralmed.components.skins.AltButtonSkin" id="selectStudentBut" styleName="choice" icon="@Embed(source='icons/search-32.png')"  click="selectStudent();"/>
+							<s:Spacer width="10"/>
+						</s:HGroup>
+						
+						<s:Spacer height="10"/>
+					</s:VGroup>
+				</s:Group>
+			</s:VGroup>
+			<s:VGroup  width="100%" horizontalAlign="right">
+				<!--<s:Spacer height="10"/>-->
+				<s:VGroup>
+					<s:Image id="student_img" ioError="student_img.source = 'icons/unknown-person.jpg'; dispatchEvent(new Event('WAIT_OFF', true));" complete="dispatchEvent(new Event('WAIT_OFF', true));"/>
+					
+				</s:VGroup>
+				
+			</s:VGroup>
+		</s:HGroup>
+		<s:Button id="gotoAssessmentBut" bottom="10" horizontalCenter="0" height="48" left="5" right="5" label="Start" visible="false" click="startExam(); changeViewTo('assessment_view')" iconPlacement="right" icon="@Embed('icons/right.png')"/>
+	</s:Group>
+	
+	<s:Group id="assessment_view" top="0" bottom="0" width="100%" visible="false" visible.assessment_view="true" visible.overall_view="false" visible.rating_view="false">
+		
+		
+		<s:VGroup width="100%" gap="0" left="5" right="5" top="5" height="40">
+			<!--Header-->
+			<s:Group width="100%" height="40">
+				<s:Rect width="100%" height="100%">
+					<s:fill>
+						<s:SolidColor color="#F3F3F3" alpha="1"/>
+					</s:fill>
+				</s:Rect>
+				<s:HGroup gap="0" verticalAlign="middle" width="100%" height="100%">
+					<s:Spacer width="1"/>
+					<s:Group width="30%" height="100%" >
+						
+						<s:Label text="Assessment Item" left="5" styleName="bold"  width="300" verticalCenter="0"/>
+						<s:Line height="100%">
+							<s:stroke>
+								<s:SolidColorStroke color="0xc0c0c0" weight="1"/>
+							</s:stroke>
+						</s:Line>
+					</s:Group>
+					<s:Group width="35%" height="100%" >
+						<s:HGroup width="100%" height="100%" verticalAlign="middle" click="showCriteriaExplanation()">
+							<s:Spacer width="5"/>
+							<s:Label text="Performance" styleName="bold"  verticalCenter="0" />
+							<s:Spacer width="100%"/>
+							<s:Image source="@Embed('icons/help.png')"  right="5"/>
+						</s:HGroup>
+						
+						<s:Line height="100%">
+							<s:stroke>
+								<s:SolidColorStroke color="0xc0c0c0" weight="1"/>
+							</s:stroke>
+						</s:Line>
+					</s:Group>
+					<s:Group width="35%" height="100%" >
+						
+						<s:Label text="Comments" left="5" styleName="bold"  verticalCenter="0" width="100%"/>
+						<s:Line height="100%">
+							<s:stroke>
+								<s:SolidColorStroke color="0xc0c0c0" weight="1"/>
+							</s:stroke>
+						</s:Line>
+					</s:Group>
+					<s:Spacer width="1"/>
+				</s:HGroup>
+			</s:Group>
+			
+		</s:VGroup>
+		
+		<!-- the container for the assessment items list -->
+		<s:Group top="45" bottom="60" left="5" right="5" width="100%">
+			<s:List id="_itemsList" dataProvider="{_currentAssessmentData}" width="100%" height="100%" itemRenderer="components.MobileAssessmentRenderer" ></s:List>
+		</s:Group>
+		
+		<!-- teh buttons at the bottom -->
+		<s:HGroup bottom="10" horizontalCenter="0" left="5" right="5" >
+			<s:Button id="gotoOverallBut" height="48" width="50%" label="Back" click="changeViewTo('overall_view')" iconPlacement="left" icon="@Embed('icons/left.png')"/>
+			<s:Button id="gotoRatingBut" height="48" width="50%" visible="false" label="Next" click="validate_rating();changeViewTo('rating_view')" iconPlacement="right" icon="@Embed('icons/right.png')"/>	
+		</s:HGroup>
+		
+	</s:Group>
+	
+	<s:Group id="rating_view" height="100%" width="100%" visible="false" visible.assessment_view="false" visible.overall_view="false" visible.rating_view="true">
+		
+		<s:VGroup width="100%" height="100%" top="5" left="5" right="5" bottom="5">
+			<s:Group width="100%" height="40">
+				<s:Rect width="100%" height="100%">
+					<s:fill>
+						<s:SolidColor id="overallratingcolour" color="#FFC8C8" alpha="1"/>
+					</s:fill>
+				</s:Rect>
+				<s:HGroup gap="0" verticalAlign="middle" width="100%" height="100%">
+					<s:Spacer width="5"/>
+					<s:Group width="100%" height="100%" >
+						<s:Label text="{_instafail?'Overall Rating (not available: essential criteria not met)':'Overall Rating (required)'}" styleName="bold"  width="100%" verticalCenter="0"/>
+					</s:Group>
+				</s:HGroup>
+			</s:Group>
+			
+			<s:Group top="45" width="100%" height="49">
+				<s:Rect width="100%" height="100%">
+					<s:fill>
+						<s:SolidColor id="overallratingcolour2" color="{_overall_rating_value>-1?uint('0xFFC8C8'):uint('0xFFC8C8')}" alpha="1"/>
+					</s:fill>
+				</s:Rect>
+				<s:HGroup width="100%" top="2" left="5" right="5">
+					<s:ToggleButton enabled="{!_instafail}"  id="overall_but0" label="Satisfactory" height="45" width="50%" click="handleOverallRatingClick(event, 1)" skinClass="com.pialabs.eskimo.skins.mobile.ios.ButtonBarFirstButtonSkin"/>
+					<s:ToggleButton enabled="{!_instafail}" id="overall_but1" label="Unsatisfactory" height="45" width="50%" click="handleOverallRatingClick(event, 0)" skinClass="com.pialabs.eskimo.skins.mobile.ios.ButtonBarLastButtonSkin"/>
+				</s:HGroup>
+			</s:Group>
+			
+			<s:Group width="100%" height="40">
+				<s:Rect width="100%" visible="{_overall_rating_value>0}" height="100%">
+					<s:fill>
+						<s:SolidColor  id="additionalratingcolour" color="#FFC8C8" alpha="1"/>
+					</s:fill>
+				</s:Rect>
+				<s:HGroup gap="0" visible="{_overall_rating_value>0}" verticalAlign="middle" width="100%" height="100%">
+					<s:Spacer width="5"/>
+					<s:Group width="100%" height="100%" >
+						<s:Label text="Additional rating if Satisfactory (required)" styleName="bold"  width="100%" verticalCenter="0"/>
+					</s:Group>
+				</s:HGroup>
+			</s:Group>
+			<s:Group top="135" width="100%" height="49">
+				<s:Rect width="100%" height="100%" visible="{_overall_rating_value>0}">
+					<s:fill>
+						<s:SolidColor  id="additionalratingcolour2" color="{_overall_rating_value>-1?uint('0xFFC8C8'):uint('0xFFC8C8')}" alpha="1"/>
+					</s:fill>
+				</s:Rect>
+				<s:HGroup top="0" width="100%" left="5" visible="{_overall_rating_value>0}" right="5">
+					<s:ToggleButton id="addidional_but0" label="Excellent" click="handleAdditionalRatingClick(event, 2)" height="45" width="33%"  skinClass="com.pialabs.eskimo.skins.mobile.ios.ButtonBarFirstButtonSkin"/>
+					<s:ToggleButton id="addidional_but1" label="Expected Standard" click="handleAdditionalRatingClick(event, 1)" height="45" width="34%" skinClass="com.pialabs.eskimo.skins.mobile.ios.ButtonBarMiddleButtonSkin"/>
+					<s:ToggleButton id="addidional_but2" label="Marginal Pass" click="handleAdditionalRatingClick(event, 0)" height="45" width="33%" skinClass="com.pialabs.eskimo.skins.mobile.ios.ButtonBarLastButtonSkin"/>
+				</s:HGroup>
+			</s:Group>
+			
+			<s:Group width="100%" top="90" height="40">
+				<s:Rect width="100%" height="100%">
+					<s:fill>
+						<s:SolidColor id="additional_comments_colour" color="#FFC8C8" alpha="1"/>
+					</s:fill>
+				</s:Rect>
+				<s:HGroup gap="0" verticalAlign="middle" width="100%" height="100%">
+					<s:Spacer width="5"/>
+					<s:Group width="100%" height="100%" >
+						<s:Label  text="Additional Comments ({_overall_rating_value==0?'required':'optional'})" styleName="bold"  width="100%" verticalCenter="0"/>
+					</s:Group>
+				</s:HGroup>
+			</s:Group>
+			<s:HGroup width="100%" height="100%">
+				
+				<s:TextArea id="additional_comments" focusOut="stage.focus = null" returnKeyLabel="done" change="validate_rating(event)" contentBackgroundColor="#FFFF99" skinClass="spark.skins.ios7.StageTextAreaSkin" width="100%" height="100%"/>
+				
+			</s:HGroup>
+			
+			
+			
+			
+			<s:Group width="100%" top="90" height="40">
+				<s:Rect width="100%" height="100%">
+					<s:fill>
+						<s:SolidColor id="signature_area_colour" color="#FFC8C8" alpha="1"/>
+					</s:fill>
+				</s:Rect>
+				<s:HGroup gap="0" verticalAlign="middle" width="100%" height="100%">
+					<s:Spacer width="5"/>
+					<s:Group width="100%" height="100%" >
+						<s:HGroup verticalAlign="middle">
+							<s:Label text="Examiner Signature (required)" styleName="bold" width="100%" verticalCenter="0"/>
+							<s:Button label="Reset" click="signature_area.erase(); signature_area.hascontent=false; validate_rating()" icon="@Embed(source='icons/refresh-24.png')" iconPlacement="right"/>
+						</s:HGroup>
+					</s:Group>
+				</s:HGroup>
+			</s:Group>
+			
+			<s:Group width="100%">
+				<s:HGroup width="100%" verticalAlign="middle">
+					<s:Group width="100%" height="145">
+						<s:Rect width="100%" height="100%">
+							<s:fill>
+								<s:SolidColor id="signature_area_colour2" color="#FFC8C8" alpha="1"/>
+							</s:fill>
+						</s:Rect>
+						<s:Rect width="100%" height="100%">
+							<s:stroke>
+								<s:SolidColorStroke weight="1" color="#000" alpha="1"/>
+							</s:stroke>
+						</s:Rect>
+						<lib:DrawingArea id="signature_area" width="80%" height="150" verticalCenter="0"/>	
+					</s:Group>
+					
+					<s:Button id="save_but" enabled="false" height="150" width="20%" label="Save" click="submitAssessment()" icon="@Embed('icons/save-48.png')" iconPlacement="right"/>
+				</s:HGroup>
+			</s:Group>
+			
+			
+			<s:HGroup bottom="0" width="100%">
+				<s:Button id="goBacktoAssessmentBut" height="48" horizontalCenter="0" width="100%"  label="Back" click="changeViewTo('assessment_view')" iconPlacement="right" icon="@Embed('icons/left.png')"/>
+			</s:HGroup>
+		</s:VGroup>
+	</s:Group>
+	
+	<s:navigationContent>
+		<s:Button icon="@Embed(source='icons/gtk-cancel.png')" label="Cancel" styleName="navigation" click="cancelExam();"/>
+	</s:navigationContent> 
+	<s:actionContent>
+		<s:Image id="network_disconnect" visible="false" source="@Embed('icons/disconnect_cross.png')"/>
+		
+	</s:actionContent>  
+</s:View>

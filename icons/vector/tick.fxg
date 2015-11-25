@@ -1,0 +1,12 @@
+<Graphic version="2.0" viewHeight="100" viewWidth="100" xmlns="http://ns.adobe.com/fxg/2008" xmlns:fxg="http://ns.adobe.com/fxg/2008" xmlns:d="http://ns.adobe.com/fxg/2008/dt">
+  <Line xFrom="13.75" xTo="38.25" yFrom="42.75" yTo="71" y="0.05" scaleX="1.0004229545593262" scaleY="0.9986593127250671">
+    <stroke>
+      <SolidColorStroke color="#94E7D0" alpha="1" weight="1"/>
+    </stroke>
+  </Line>
+  <Line xFrom="64.15" xTo="38.45" yFrom="30" yTo="71.2">
+    <stroke>
+      <SolidColorStroke color="#AE0DB9" alpha="1" weight="1"/>
+    </stroke>
+  </Line>
+</Graphic>

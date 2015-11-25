@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group width="100%" xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" >
+	<fx:Script>
+		<![CDATA[
+			import mx.events.IndexChangedEvent;
+			
+			import spark.events.IndexChangeEvent;
+			
+			[Bindable]
+			private var _backgroundColour:uint = 0xff0000;
+			
+			[Bindable]
+			private var _data:Object = new Object();
+			
+			[Bindable]
+			private var _studentimagesrc:String = "";
+			
+			private var _isvalid:Boolean = false;
+			
+			private var _commentData:String = "";
+			
+			private var _currentValue:int = -1;
+			
+			public function get currentValue():int
+			{
+				return _currentValue;
+			}
+			
+			public function set currentValue(value:int):void
+			{
+				_currentValue = value;
+			}
+			
+			public function get commentData():String
+			{
+				_commentData = comment.text;
+				return _commentData;
+			}
+			
+			public function set commentData(value:String):void
+			{
+				_commentData = value;
+				comment.text = _commentData;
+			}
+			
+			[Bindable]
+			public function get isvalid():Boolean
+			{
+				return _isvalid;
+			}
+			
+			public function set isvalid(value:Boolean):void
+			{
+				_isvalid = value;
+			}
+			
+			public function set data(value:Object):void { 
+				trace('value is:'+value);
+				_data = value;
+			}
+			
+			public function get data():Object{ 
+				return new XML(<question>
+  <id>88</id>
+  <text>Hands are rubbed palm to palm with fingers interlaced</text>
+  <type>0</type>
+</question>);
+			}
+			
+			
+			private function validate():void{
+				//	bb.requireSelection = true;
+				//		trace(bb.selectedItem.value);
+				_data._isvalid = ((_data._currentValue==1)||((_data._currentValue==0)&&(comment.text.length>0)));
+				if(_data._isvalid){
+					_backgroundColour = 0x00ff00;
+				}else{
+					_backgroundColour = 0xff0000;
+				}
+			}
+			
+			// make the buttons work like a button bar 
+			private function select(event:MouseEvent, value:int):void{
+				trace(value);
+				if(event.target == this.but0){
+					this.but1.selected = false;
+				}else{
+					this.but0.selected = false;
+				}
+				_data._currentValue = value;
+				validate();
+			}
+			
+			
+			
+		]]>
+	</fx:Script>
+
+		
+		<s:Rect width="100%" height="100%">
+			<s:fill>
+				<s:SolidColor color="{_backgroundColour}" alpha="0.2"/>
+			</s:fill>
+		</s:Rect>
+		<s:Rect width="100%" height="100%">
+			<s:stroke>
+				<s:SolidColorStroke color="0xc0c0c0" weight="1"/>
+			</s:stroke>
+		</s:Rect>
+		<s:HGroup top="5" gap="0" bottom="5" width="100%" verticalAlign="middle">
+			<s:Spacer width="1"/>
+			<s:Group width="300" height="100%" >
+				<s:Label maxDisplayedLines="{-1}"  lineBreak="toFit" text="number here){_data.text}" verticalCenter="0" width="300" height="100%"/>
+				<s:Line height="100%">
+					<s:stroke>
+						<s:SolidColorStroke color="0xc0c0c0" weight="1"/>
+					</s:stroke>
+				</s:Line>
+			</s:Group>
+			<s:Group width="300" height="40">
+				<s:HGroup height="100%" verticalCenter="0" width="100%">
+					<!--		<s:ButtonBar id="bb" change="validate()" height="100%" verticalCenter="0" width="100%">
+					<s:ArrayCollection>
+					<fx:Object label="Satisfactory" value="1"/>
+					<fx:Object label="Unsatisfactory" value="0"/>
+					</s:ArrayCollection>
+					</s:ButtonBar>-->
+					<s:ToggleButton id="but0" label="Satisfactory" height="45" width="50%" click="select(event, 1)" skinClass="com.pialabs.eskimo.skins.mobile.ios.ButtonBarFirstButtonSkin"/>
+					<s:ToggleButton id="but1" label="Unsatisfactory" height="45" width="50%" click="select(event, 0)" skinClass="com.pialabs.eskimo.skins.mobile.ios.ButtonBarLastButtonSkin"/>
+				</s:HGroup>
+				<s:Line height="100%">
+					<s:stroke>
+						<s:SolidColorStroke color="0xc0c0c0" weight="1"/>
+					</s:stroke>
+				</s:Line>
+			</s:Group>
+			<s:Group  width="100%" height="100%">
+				<s:TextInput id="comment" change="validate()" width="100%" verticalCenter="0" skinClass="spark.skins.mobile.TextInputSkin" />
+				<s:Line height="100%">
+					<s:stroke>
+						<s:SolidColorStroke color="0xc0c0c0" weight="1"/>
+					</s:stroke>
+				</s:Line>
+			</s:Group>
+		</s:HGroup>
+
+</s:Group>

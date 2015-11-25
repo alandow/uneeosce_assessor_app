@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:View xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		xmlns:s="library://ns.adobe.com/flex/spark" creationComplete="view1_creationCompleteHandler(event)">
+	<s:titleContent>
+		<s:Label width="100%" textAlign="center" styleName="titlestyle" text="{_sysname+'\r'}Logged in as:{_loggedonusername}"/>
+	</s:titleContent>
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import au.com.clinman.events.GetExamsForUserCompleteEvent;
+			import au.com.clinman.events.RecordPickEvent;
+			import au.com.clinman.mobile.lib.FileIO;
+			import au.com.clinman.mobile.lib.Web_Service_Interface;
+			
+			import com.pialabs.eskimo.controls.SkinnableAlert;
+			
+			import mx.collections.ArrayList;
+			import mx.collections.XMLListCollection;
+			import mx.events.CloseEvent;
+			import mx.events.FlexEvent;
+			import mx.rpc.events.FaultEvent;
+			
+			import spark.components.LabelItemRenderer;
+			
+			private var dummy:LabelItemRenderer
+			
+			[Bindable]
+			private var _sysname:String = "";
+			
+			[Bindable]
+			private var _loggedonusername:String = "";
+			
+			
+			[Bindable]
+			private var _demomode:Boolean = false;
+			
+			[Bindable]
+			private var _feedbackStr:String = "";
+			
+			[Bindable]
+			private var _currentExamButtonList:XMLListCollection = new XMLListCollection();
+			
+			//	private var _io:FileIO;
+			
+			private var _webservice:Web_Service_Interface;
+			
+			private var _inError:Boolean = false;
+			
+			override public function set data(value:Object):void{
+				super.data = value;
+				this._inError = false;
+				//this._io = value.io; 
+				_demomode = value.demomode;
+				if(!_demomode){
+					this._webservice = value.webservice;
+					network_disconnect.visible = !_webservice.monitor.available;
+					this._webservice.addEventListener("MONITOR_STATUS_CHANGE", handleNetworkStatusChange);
+					this._sysname = this._webservice.io.readSetting('systemname');
+					this._loggedonusername = this._webservice.io.readSetting('currentusername');
+					_feedbackStr+='Setting data;';
+					//callLater(getAssessments);
+				}else{
+					this._webservice = value.webservice;
+					network_disconnect.visible = false;
+					this._sysname = 'UNE eOSCE Demo mode';
+					this._loggedonusername = 'Demo User';
+					//	callLater(getAssessments);
+				}
+			}
+			
+			protected function view1_creationCompleteHandler(event:FlexEvent):void
+			{
+				_feedbackStr+='view1_creationCompleteHandler happens;';
+				//dispatchEvent(new Event('WAIT_ON', true));
+				this.getAssessments();				
+			}
+			
+			
+			private function getAssessments():void{
+				if(!_demomode){
+					this.parentApplication.theview.actionBar.setStyle('chromeColor', '#3D3E3F');
+					dispatchEvent(new Event('WAIT_ON', true));
+					_webservice.addEventListener(GetExamsForUserCompleteEvent.DATA_READY, handleGetExamsForUserCompleteEvent);
+					_webservice.addEventListener(FaultEvent.FAULT, handleWebserviceError); 
+					_feedbackStr+='token at getAssessments is:'+this._webservice.io.readSetting('token')+';';
+					_webservice.getExamsForUser(this._webservice.io.readSetting('currentuserID'), this._webservice.io.readSetting('token'));
+				}else{
+					_currentExamButtonList =  new XMLListCollection(this._webservice.io.demoXML.exam_cache.children());
+				}
+			}
+			
+			private function handleGetExamsForUserCompleteEvent(e:GetExamsForUserCompleteEvent):void{
+				//trace('HomeView.handleGetExamsForUserCompleteEvent says:'+e.results);
+				_feedbackStr+='handleGetExamsForUserCompleteEvent says:'+e.results;
+				if(e.results.children().length()>0){
+					examContainerFeedback.text = 'Available Examinations:';
+					_currentExamButtonList = new XMLListCollection(e.results.children());
+				}else{
+					examContainerFeedback.text = 'No examinations available';
+				}
+				dispatchEvent(new Event('WAIT_OFF', true));
+			}
+			
+			
+			
+			public function gotoExam(id:String):void{
+				trace('opening exam:'+id)
+				dispatchEvent(new RecordPickEvent(RecordPickEvent.EVENT, id, true));
+			}
+			
+			
+			
+			protected function button2_clickHandler(event:MouseEvent):void
+			{
+				dispatchEvent(new Event('GO_PICKER', true));
+			}
+			
+			
+			
+			private function handleWebserviceError(e:FaultEvent):void{
+				try{
+					_webservice.removeEventListener(GetExamsForUserCompleteEvent.DATA_READY, handleGetExamsForUserCompleteEvent);
+					_webservice.removeEventListener(FaultEvent.FAULT, handleWebserviceError); 
+				}catch(e:Error){}
+				dispatchEvent(new Event('WAIT_OFF', true));
+				if(!_inError){
+					_inError = true
+					SkinnableAlert.show(e.message.body.toString(), "Network error!",SkinnableAlert.OK, this, handleErrorCloseEvent)
+				}
+			}
+			
+			private function logout():void{
+				SkinnableAlert.show("Do you really want to log out?", "Really?", SkinnableAlert.YES|SkinnableAlert.NO, this, handleCloseEvent)
+			}
+			
+			private function handleCloseEvent(e:CloseEvent):void{
+				if(e.detail==SkinnableAlert.YES){
+					
+					this._webservice.io.writeSetting('token', '');
+					
+					dispatchEvent(new Event('GO_LOGON', true));
+				}
+			}
+			
+			private function handleErrorCloseEvent(e:CloseEvent):void{
+				this._webservice.io.writeSetting('token', '');
+				
+				dispatchEvent(new Event('GO_LOGON', true));
+			}
+			
+			private function handleNetworkStatusChange(e:Event):void{
+				network_disconnect.visible = !_webservice.monitor.available;
+			}
+			
+		]]>
+	</fx:Script>
+	<s:VGroup width="100%" bottom="10" top="0" horizontalAlign="center">
+		<s:Spacer height="10"/>
+		
+		<s:VGroup id="examContainer" width="95%" horizontalCenter="0" height="100%">
+			<s:Label id="examContainerFeedback" text="" fontSize="26" color="#7D5177" styleName="bold"/>		
+			<s:List id="_examList" dataProvider="{_currentExamButtonList}"
+					
+					height="100%"
+					width="100%"
+					borderVisible="false"
+					>
+				<s:itemRenderer>
+					<fx:Component>
+						<s:ItemRenderer>
+							<s:VGroup  width="100%">
+								<s:Button width="100%" height="48" icon="@Embed('icons/right.png')" chromeColor="{data.practicing=='true'?new uint(0xFCB430):new uint(0x96C03D)}" iconPlacement="right" label="{data.name+(data.practicing=='true'?' (Practice)':'')}"  click="outerDocument.gotoExam(data.id)"/>
+								<s:Spacer height="10"/>
+							</s:VGroup>
+							
+						</s:ItemRenderer>
+						
+					</fx:Component>
+				</s:itemRenderer>
+			</s:List>
+			<!--<s:TextArea enabled="false" id="thedisplay" text="{_feedbackStr}" width="100%" height="100%" skinClass="au.edu.une.ruralmed.components.skins.AdamsTextAreaSkin"/>-->
+		</s:VGroup>
+		
+		
+	</s:VGroup>
+	<s:navigationContent>
+		<s:Button id="logoutbut" label="Logout" icon="@Embed('icons/System-Logout-icon-24.png')" styleName="navigation" click="logout()"/>
+	</s:navigationContent> 
+	<s:actionContent>
+		<s:Image id="network_disconnect" visible="false" source="@Embed('icons/disconnect_cross.png')"/>
+		<s:Button label="Refresh" icon="@Embed(source='icons/refresh-24.png')" styleName="navigation" click="getAssessments();"/>
+	</s:actionContent>    
+</s:View>

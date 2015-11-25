@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:SkinnablePopUpContainer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+						   xmlns:s="library://ns.adobe.com/flex/spark" width="600" minHeight="500" creationPolicy="all" creationComplete="skinnablepopupcontainer1_creationCompleteHandler(event)">
+	<fx:Script>
+		<![CDATA[
+			import mx.events.FlexEvent;
+			
+			import spark.components.supportClasses.StyleableTextField;
+			
+			
+			[Bindable]
+			private var _displayStr:String = "";
+			
+					
+			public function set explanationData(value:XML):void{
+				_displayStr = "";
+				
+				
+				for each (var def : XML in XMLList(value.children())) {
+					_displayStr+="<b>"+def.short_description+":</b><br/>"+def.long_description+"<br/>";
+				}
+				
+			}
+			
+			protected function skinnablepopupcontainer1_creationCompleteHandler(event:FlexEvent):void
+			{
+				StyleableTextField(thedisplay.textDisplay).htmlText = _displayStr;
+				
+			}
+			
+		]]>
+	</fx:Script>
+	<s:VGroup horizontalAlign="center" width="100%" height="100%">
+		<s:Group width="100%" height="50">
+			<s:Rect width="100%" height="100%">
+				<s:fill>
+					<s:LinearGradient rotation="90">
+						<s:GradientEntry color="#403F41"/>
+						<s:GradientEntry color="#000000"/>
+					</s:LinearGradient>
+				</s:fill>
+			</s:Rect>
+			<s:Label text="Explanation of Criteria" horizontalCenter="0" verticalCenter="0"  color="0xffffff" fontSize="18"/>
+		</s:Group>
+	<s:TextArea enabled="false" id="thedisplay"  width="98%" height="100%" skinClass="au.edu.une.ruralmed.components.skins.AdamsTextAreaSkin"/>
+	<s:Button width="98%" height="48" label="OK" click="this.close(false);"  icon="@Embed('icons/tick-32.png')"/>
+		<s:Spacer height="1"/>
+	</s:VGroup>
+</s:SkinnablePopUpContainer>

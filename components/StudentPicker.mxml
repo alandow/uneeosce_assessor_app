@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:SkinnablePopUpContainer xmlns:fx="http://ns.adobe.com/mxml/2009" styleName=""
+						   xmlns:s="library://ns.adobe.com/flex/spark"  open="skinnablepopupcontainer1_creationCompleteHandler(event)" maxHeight="500">
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import au.com.clinman.events.GetStudentsBySearchStrForFormCompleteEvent;
+			import au.com.clinman.mobile.lib.Web_Service_Interface;
+			
+			import mx.collections.XMLListCollection;
+			import mx.events.FlexEvent;
+			
+			public var _webservice:Web_Service_Interface;
+			
+			private var _formid:String = "";
+			
+			[Bindable]
+			private var _displayData:XMLListCollection = new XMLListCollection();
+			
+			[Bindable]
+			private var _displayDataSource:XMLList = new XMLList();
+			
+			
+			public var _demomode:Boolean = false;
+			
+			public function set demomode(value:Boolean):void
+			{
+				_demomode = value;
+			}
+			
+			public function set formid(value:String):void
+			{
+				_formid = value;
+			}
+			
+			public function set webservice(value:Web_Service_Interface):void
+			{
+				_webservice = value;
+			}
+
+			
+			protected function skinnablepopupcontainer1_creationCompleteHandler(event:Event):void
+			{
+				
+				getStudentList();
+			}
+			
+			private function getStudentList():void{
+				_displayData.source = null;
+				if(!_demomode){
+				_webservice.addEventListener(GetStudentsBySearchStrForFormCompleteEvent.DATA_READY, handleGetStudentsBySearchStrForFormCompleteEvent);
+				_webservice.getStudentsBySearchStrForForm(this._formid, this._webservice.io.readSetting('token'));
+				}else{
+					_displayDataSource = _webservice.io.demoXML.exam_cache.instance[0].students.data[0].children();
+					_filtered_displayData.source = _displayDataSource; 
+				}
+			}
+			
+			private function handleGetStudentsBySearchStrForFormCompleteEvent(e:GetStudentsBySearchStrForFormCompleteEvent):void{
+				trace('handleGetStudentsBySearchStrForFormCompleteEvent says:'+e.results);
+				_displayDataSource = e.results.children();
+				_filtered_displayData.source = _displayDataSource; 
+			}
+			
+			[Bindable]
+			private var _filtered_displayData:XMLListCollection = new XMLListCollection();
+			
+			
+			public function set displayData(value:XMLList):void{
+				
+				_displayDataSource = value;
+				_filtered_displayData = new XMLListCollection(_displayDataSource);
+				
+			}
+			
+			private var reg:RegExp;
+			
+			// filtering function
+			private function filterDisplayData(e:Event = null):void{
+				reg = new RegExp(searchStrInput.text,'i');
+				_filtered_displayData = new XMLListCollection(_displayDataSource.(this.reg.test(searchfield)));
+				
+			}
+
+			
+			protected function button1_clickHandler(event:MouseEvent):void
+			{
+				getStudentList();
+				
+			}
+			
+		]]>
+	</fx:Script>
+	<s:VGroup width="100%" height="100%" horizontalAlign="center">
+		<s:Group width="100%" height="50">
+			<s:Rect width="100%" height="100%">
+				<s:fill>
+					<s:LinearGradient rotation="90">
+						<s:GradientEntry color="#403F41"/>
+						<s:GradientEntry color="#000000"/>
+					</s:LinearGradient>
+				</s:fill>
+			</s:Rect>
+			<s:Label text="Select student" horizontalCenter="0" verticalCenter="0"  color="0xffffff" fontSize="18"/>
+		</s:Group>
+		<s:HGroup>
+			<s:TextInput id="searchStrInput" styleName="searchfield" change="filterDisplayData(event)" skinClass="com.pialabs.eskimo.skins.mobile.ios.SearchTextInputSkin"/>
+		</s:HGroup>
+		
+		
+		
+		<s:List id="_optionsList"
+				dataProvider="{_filtered_displayData}"
+				alternatingItemColors="[#DCDCDC, #FFFFFF]"
+				height="100%"
+				width="100%"
+				
+				borderVisible="false"
+				contentBackgroundColor="#FFFFFF">
+			<s:itemRenderer>
+				<fx:Component>
+					
+					<s:ItemRenderer>
+						<fx:Script>
+							<![CDATA[
+								
+								[Bindable]
+								private var _data:Object = new Object();
+								
+								[Bindable]
+								private var _studentimagesrc:String = "";
+								
+								override public function set data(value:Object):void { 
+									super.data = value; 
+									_data = value;	
+									studentimg.source = outerDocument._webservice.monitor.available?(outerDocument._demomode?'icons\/demo\/'+data.thumb:(outerDocument._webservice.io.readSetting('functionpath')+'?app=true&action=showstudentimage&studentid='+_data.id+'&getbig=false&token='+outerDocument._webservice.io.readSetting('token'))):'icons\/placeholder_small.jpg';
+								}
+								
+							]]>
+						</fx:Script>
+						<s:HGroup verticalAlign="middle" width="100%"  click="outerDocument.close(true, _data);">
+							<s:Spacer width="5"/>
+							<s:VGroup width="100%">
+								<s:Label text="{_data.fname} {_data.lname}"  width="100%" verticalAlign="middle" styleName="bold" fontSize="16"/>
+								<s:Label text="{_data.studentnum}"  width="100%" verticalAlign="middle" styleName="bold" fontSize="16"/>
+							</s:VGroup>
+							
+							<s:Image id="studentimg"  verticalAlign="middle"/>
+							<!--<s:Image source="@Embed('icons/checkmark-32.png')" verticalAlign="middle"/>-->
+								
+							
+						</s:HGroup>
+						
+					</s:ItemRenderer>
+					
+				</fx:Component>
+			</s:itemRenderer>
+		</s:List>
+		<s:Button width="98%" height="48" label="Cancel" click="this.close(false);"
+				  icon="@Embed('icons/gtk-cancel.png')"/>
+		<s:Spacer height="1"/>
+	</s:VGroup>
+</s:SkinnablePopUpContainer>

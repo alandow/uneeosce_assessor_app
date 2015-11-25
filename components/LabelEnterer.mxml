@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:SkinnablePopUpContainer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+						   xmlns:s="library://ns.adobe.com/flex/spark" creationComplete="init();" backgroundAlpha="0" width="50%">
+	
+	<fx:Script>
+		<![CDATA[
+			private function init():void{
+		if(Capabilities.os.indexOf('iPhone')!= -1){
+					urnumInput.setStyle('skinClass', 'spark.skins.mobile.TextInputSkin')
+				}
+			}
+			
+			protected function button1_clickHandler(event:MouseEvent):void
+			{
+				this.close(true, urnumInput.text);
+			}
+		]]>
+	</fx:Script>
+	
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	<s:Rect radiusX="5" radiusY="5" height="100%" width="100%">
+		<s:fill>
+			<s:LinearGradient rotation="90">
+				<s:GradientEntry color="#403F41"/>
+				<s:GradientEntry color="#000000"/>
+			</s:LinearGradient>
+		</s:fill>
+	</s:Rect>
+	<s:VGroup width="100%" verticalCenter="0" horizontalAlign="center">
+		<s:Spacer height="10"/>
+		
+			<s:Label color="#FFFFFF" fontSize="24" fontWeight="bold" text="Image Label"></s:Label>
+				<s:TextInput id="urnumInput" width="95%" />
+			
+		<s:Spacer height="10"/>
+			
+		
+		<s:Button width="95%" label="Submit" icon="@Embed('icons/filesave.png')" click="button1_clickHandler(event)"/>
+		<s:Button width="95%" label="Cancel" icon="@Embed('icons/gtk-cancel-48.png')" click="this.close(false);"/>
+		<s:Spacer height="5"/>
+	</s:VGroup>
+	
+</s:SkinnablePopUpContainer>
