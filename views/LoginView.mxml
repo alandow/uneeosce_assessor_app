@@ -81,7 +81,7 @@
 					<s:SolidColor color="#FFFF99"/>
 				</s:fill>
 			</s:Rect>
-		<s:TextInput id="username" text="examiner" autoCorrect="false" autoCapitalize="none" skinClass="spark.skins.ios7.StageTextInputSkin" contentBackgroundColor="#FFFF99"/>
+		<s:TextInput id="username" text="" autoCorrect="false" autoCapitalize="none" skinClass="spark.skins.ios7.StageTextInputSkin" contentBackgroundColor="#FFFF99"/>
 			</s:Group>
 		<s:Label text="Password" color="#7D5177" fontSize="26" styleName="bold"/>
 		<s:Group>
@@ -90,7 +90,7 @@
 					<s:SolidColor color="#FFFF99"/>
 				</s:fill>
 			</s:Rect>
-			<s:TextInput id="password" text="password"  displayAsPassword="true" skinClass="spark.skins.ios7.StageTextInputSkin" contentBackgroundColor="#FFFF99"/>
+			<s:TextInput id="password" text=""  displayAsPassword="true" skinClass="spark.skins.ios7.StageTextInputSkin" contentBackgroundColor="#FFFF99"/>
 		</s:Group>
 		<s:Button id="logonBut" width="95%" label="Login"  icon="@Embed('icons/System-Login-icon-48.png')" click="logonBut_clickHandler(event)"/>
 		<s:Label id="feedback" color="#FF0000"/>
@@ -98,5 +98,5 @@
 		<s:Button width="95%" label="Settings" icon="@Embed('icons/settings3-48.png')" click="button1_clickHandler(event)"/>
 		<s:Spacer height="10%"/>
 	</s:VGroup>
-	<s:Label right="2" bottom="2" text="Version 1.5.1"/>
+	<s:Label right="2" bottom="2" text="Version 1.5.2"/>
 </s:View>

@@ -93,7 +93,7 @@ package au.com.clinman.mobile.lib
 		
 		// some deafult data
 		private var settingsXML:XML = <data>
-										<functionpath>https://corvid.une.edu.au/eOSCE_ng/backend/service.php</functionpath>
+										<functionpath>https://your_UNE_eOSCE_URL.com/backend/service.php</functionpath>
 										<systemname>UNE eOSCE</systemname>
 										<firstrun>true</firstrun>
 									  </data>;

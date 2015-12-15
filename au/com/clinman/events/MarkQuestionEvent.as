@@ -5,11 +5,12 @@ package au.com.clinman.events
 	public class MarkQuestionEvent extends Event
 	{
 		
-		public function MarkQuestionEvent(type:String, questionID:String, value:String, bubbles:Boolean=false, cancelable:Boolean=false)
+		public function MarkQuestionEvent(type:String, questionID:String, value:String, buttonid:String, bubbles:Boolean=false, cancelable:Boolean=false)
 		{
 			super(type, bubbles, cancelable);
 			this._questionID = questionID;
 			this._value = value;
+			this._buttonid = buttonid;
 		}
 		
 		
@@ -18,7 +19,13 @@ package au.com.clinman.events
 		{
 			return _value;
 		}
-				
+		
+		private var _buttonid:String = '0';
+		public function get buttonid():String
+		{
+			return _buttonid;
+		}	
+		
 		private var _questionID:String = "";
 		
 		

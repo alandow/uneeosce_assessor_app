@@ -348,6 +348,7 @@
 				_instafail = false;
 				var itemid:String = e.questionID;
 				_currentAssessmentData.source.(@id==e.questionID).value=e.value;
+				_currentAssessmentData.source.(@id==e.questionID).buttonid=e.buttonid;
 				//	trace('marking something:'+_currentAssessmentData.source.(@id==e.questionID))
 				var valid:Boolean = false;
 				//trace('marking question ID '+e.questionID+' to value ' +e.value);
@@ -365,10 +366,6 @@
 				
 				_currentAssessmentData.source.(@id==e.questionID).isvalid= (valid?'true':'false');
 				
-				
-				//_currentAssessmentData.refresh();
-				
-				//(_itemsList.dataProvider as XMLListCollection).refresh();
 				// save question data to file
 				if(!_demomode){
 					_webservice.io.updateAnswerCache('<questiondata>'+_currentAssessmentData.source.toString()+'</questiondata>', _currentStudentData.id, _examID) ;

@@ -1,12 +1,5 @@
 package components
 {
-	import au.com.clinman.events.MakeCommentEvent;
-	import au.com.clinman.events.MarkQuestionEvent;
-	import au.com.clinman.events.StartCommentEvent;
-	import au.com.clinman.mobile.lib.CommentTextHolder;
-	import au.edu.une.ruralmed.components.skins.AdamsTextInputSkin;
-	import au.edu.une.ruralmed.components.skins.AltButtonSkin;
-	
 	import com.pialabs.eskimo.skins.mobile.ios.ButtonBarFirstButtonSkin;
 	import com.pialabs.eskimo.skins.mobile.ios.ButtonBarLastButtonSkin;
 	import com.pialabs.eskimo.skins.mobile.ios.ButtonSkin;
@@ -38,6 +31,13 @@ package components
 	import spark.events.TextOperationEvent;
 	import spark.primitives.Rect;
 	import spark.skins.mobile.TextInputSkin;
+	
+	import au.com.clinman.events.MakeCommentEvent;
+	import au.com.clinman.events.MarkQuestionEvent;
+	import au.com.clinman.events.StartCommentEvent;
+	import au.com.clinman.mobile.lib.CommentTextHolder;
+	import au.edu.une.ruralmed.components.skins.AdamsTextInputSkin;
+	import au.edu.une.ruralmed.components.skins.AltButtonSkin;
 	
 	import utils.string.htmlDecode;
 	
@@ -101,6 +101,10 @@ package components
 		
 		private var _i:int = 0;
 		
+		/*private var _buttonid:int = 0;*/
+		
+		private var _currentbuttonid:String = '';
+		
 		public function MobileAssessmentRenderer()
 		{
 			super();
@@ -131,20 +135,20 @@ package components
 			//  make a little essential indicator
 			_isEssentialIndicator = new Image();
 			_isEssentialIndicator.source= "icons/thin_alert_icon.png";
-		
+			
 			// hide it
 			_isEssentialIndicator.visible = false;
 			_isEssentialIndicator.percentWidth = 0;
 			
 			_hgroup.addElement(_isEssentialIndicator);
-						
+			
 			// set up label
 			_label = new Label();
 			this._label.maxDisplayedLines = -1;
 			this._label.percentWidth = 30;
 			this._label.setStyle('lineHeight', "100%");
 			this._label.setStyle('lineBreak', "toFit");
-
+			
 			_hgroup.addElement(_label);
 			
 			// set up buttons container
@@ -198,6 +202,9 @@ package components
 		
 		private var _needs_comment_value:String = ""; 
 		
+		private var _invalidColour:SolidColor = new SolidColor(0xFFC8C8);
+		private var _validColour:SolidColor = new SolidColor(0xC8FFC8);
+		
 		override public function set data(value:Object):void
 		{
 			
@@ -206,32 +213,48 @@ package components
 			if(!_ratingScale){
 				_ratingScale = XMLList(Object(owner).parentDocument['currentExamRatingScaleList']);
 				// set up buttons here
-				for each (var buttonDef : XML in _ratingScale) {
-					_buttons.push(new ToggleButton());
-					_buttons[_buttons.length-1].label = buttonDef.short_description;
-					_buttons[_buttons.length-1].setStyle('skinClass', com.pialabs.eskimo.skins.mobile.ios.ButtonSkin);
-					_buttons[_buttons.length-1].addEventListener(MouseEvent.CLICK, select);
-					_buttons[_buttons.length-1].height = 40;
-					_buttons[_buttons.length-1].percentWidth = (100/_ratingScale.length());
-					_buttonGroup.addElement(_buttons[_buttons.length-1]);
-					if(buttonDef.needs_comment.toString()=='true'){
-						_needs_comment_value = buttonDef.needs_comment.toString();
+				if(_buttons.length<1){
+					for each (var buttonDef : XML in _ratingScale) {
+						_buttons.push(new ToggleButton());
+						_buttons[_buttons.length-1].label = buttonDef.short_description;
+						_buttons[_buttons.length-1].setStyle('skinClass', com.pialabs.eskimo.skins.mobile.ios.ButtonSkin);
+						_buttons[_buttons.length-1].addEventListener(MouseEvent.CLICK, select);
+						_buttons[_buttons.length-1].height = 40;
+						_buttons[_buttons.length-1].percentWidth = (100/_ratingScale.length());
+						_buttons[_buttons.length-1].id = (_buttons.length-1).toString();
+						_buttonGroup.addElement(_buttons[_buttons.length-1]);
+						
+						if(buttonDef.needs_comment.toString()=='true'){
+							_needs_comment_value = buttonDef.needs_comment.toString();
+						}
+						/*if(_buttons[_buttons.length-1].id == _currentbuttonid){
+						_buttons[_buttons.length-1].selected = true;
+						}*/
 					}
 				}
 			}
 			
 			// set selected button 
+			
+			if(_data.hasOwnProperty('buttonid')){
+				_currentbuttonid = data.buttonid;
+				//trace('_currentbuttonid = '+_currentbuttonid);
+				//_buttons[int(_currentbuttonid)].selected = true;
+			}
+			_buttons.forEach(togglebuttons);
+			
+			// set comments field feedback
 			if(_data.hasOwnProperty('value')){	
 				for(_i = 0; _i<_ratingScale.length(); _i++) {
 					if(_ratingScale[_i].value == _data.value){
 						_value = _ratingScale[_i].value;
-						_buttons[_i].selected = true;
+						//_buttons[_i].selected = true;
 						if(_needs_comment_value==_value.toString()){
 							this._bgrect.fill = new SolidColor(0xFFC8C8);
 						}
-					}else{
-						_buttons[_i].selected = false;
-					}
+					}/*else{
+					_buttons[_i].selected = false;
+					}*/
 					
 				}
 				
@@ -241,16 +264,18 @@ package components
 				}
 			}
 			
+			
+			
 			_isEssentialIndicator.visible = false;
 			_isEssentialIndicator.percentWidth = 0;
 			this._label.percentWidth = 30;
 			// is this essential? if so, show it
 			if(_data.hasOwnProperty('type')){
 				if(_data.type.toString()=='1'){
-				_isEssentialIndicator.visible = true;
-				_isEssentialIndicator.percentWidth = 2;
-				this._label.percentWidth = 28;
-				//trace('is essential');
+					_isEssentialIndicator.visible = true;
+					_isEssentialIndicator.percentWidth = 2;
+					this._label.percentWidth = 28;
+					//trace('is essential');
 				}
 			}
 			
@@ -264,20 +289,20 @@ package components
 			}else{
 				this._commentField.text = '';
 			}
-			this.removeElement(_bgrect);
-
-			// work out validity
+		
 			
+			// work out validity
+			this.removeElement(_bgrect);
 			if(this._data.hasOwnProperty('isvalid')){
 				//trace('this thing has isvalid:'+this._data.isvalid);
 				if(this._data.isvalid.toString()=='true'){
-					this._bgrect.fill = new SolidColor(0xC8FFC8);
+					this._bgrect.fill = _validColour;
 				}else{
-					this._bgrect.fill = new SolidColor(0xFFC8C8);
+					this._bgrect.fill = _invalidColour;
 					//trace('this thing is not valid');
 				}
 			}else{
-				this._bgrect.fill = new SolidColor(0xFFC8C8);
+				this._bgrect.fill = _invalidColour;
 			}
 			
 			this.addElementAt(_bgrect,0);
@@ -287,25 +312,21 @@ package components
 		// make the buttons work like a button bar 
 		private function select(event:MouseEvent):void{
 			
-			/*	if(event.target == this._but0){
-			this._but1.selected = false;
-			_value = "0";
-			}else{
-			this._but0.selected = false;
-			_value = "1";
-			}*/
-			//trace(_buttons.indexOf(event.target));
 			_value = _ratingScale[_buttons.indexOf(event.target)].value;
-			//trace('value is:'+_value);
-			for each (var button : ToggleButton in _buttons) {
-				if(button == event.target){
-					button.selected = true;
-				}else{
-					button.selected = false;
-				}
-				
+			_currentbuttonid = event.target.id
+			trace('value is:'+_value);
+			// Make buttons toggle
+			_buttons.forEach(togglebuttons);
+			event.target.selected = true;
+			dispatchEvent(new MarkQuestionEvent(MarkQuestionEvent.EVENT, _data.id, _value, _currentbuttonid, true));
+		}
+		
+		private function togglebuttons(element:ToggleButton, index:Number, arr:Array):void {
+			if(index.toString() == _currentbuttonid){
+				element.selected = true;
+			}else{
+				element.selected = false;
 			}
-			dispatchEvent(new MarkQuestionEvent(MarkQuestionEvent.EVENT, _data.id, _value, true));
 		}
 		
 		private function showCommentEntry(e:Event):void{
